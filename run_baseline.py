@@ -21,8 +21,12 @@ from matplotlib import animation
 from ising import sweep_temperatures, record_trajectory
 
 # ----- configuration -------------------------------------------------------
-OUT = "./outputs"
+OUT      = "./outputs/baseline"
+OUT_SNAP = "./outputs/snapshots"
+OUT_ANIM = "./outputs/animation"
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(OUT_SNAP, exist_ok=True)
+os.makedirs(OUT_ANIM, exist_ok=True)
 
 L = 20
 J = 1.00           # physical scale; only matters if you want absolute T
@@ -53,14 +57,17 @@ results, snap_lattices = sweep_temperatures(
     return_lattices_at=snap_targets,
 )
 
-T_arr   = np.array([r["T_over_J"] for r in results])
-m_arr   = np.array([r["abs_m"]   for r in results])
-e_arr   = np.array([r["energy"]  for r in results])
-chi_arr = np.array([r["chi"]     for r in results])
-cv_arr  = np.array([r["cv"]      for r in results])
+T_arr       = np.array([r["T_over_J"]   for r in results])
+m_arr       = np.array([r["abs_m"]      for r in results])
+m_mean_arr  = np.array([r["m_mean"]     for r in results])
+e_arr       = np.array([r["energy"]     for r in results])
+chi_arr     = np.array([r["chi_abs"]    for r in results])
+chi_s_arr   = np.array([r["chi_signed"] for r in results])
+cv_arr      = np.array([r["cv"]         for r in results])
 
 np.savez(os.path.join(OUT, "baseline_results.npz"),
-         T_over_J=T_arr, abs_m=m_arr, energy=e_arr, chi=chi_arr, cv=cv_arr,
+         T_over_J=T_arr, abs_m=m_arr, m_mean=m_mean_arr,
+         energy=e_arr, chi=chi_arr, chi_signed=chi_s_arr, cv=cv_arr,
          L=L, J=J, h_over_J=H_OVER_J, T_c_exact=T_C)
 
 # ----- four observable plots ----------------------------------------------
@@ -102,33 +109,51 @@ for T, lat in snap_lattices.items():
     ax.imshow(lat, cmap="RdBu", vmin=-1, vmax=1, interpolation="nearest")
     ax.set_title(f"{label}: T/J = {T:.3f} | L={L}, h/J={H_OVER_J}")
     ax.set_xticks([]); ax.set_yticks([])
-    fig.tight_layout(); fig.savefig(os.path.join(OUT, fname), dpi=140); plt.close(fig)
+    fig.tight_layout(); fig.savefig(os.path.join(OUT_SNAP, fname), dpi=140); plt.close(fig)
 
-# Combined snapshot figure as bonus
+# Combined snapshot figure
 fig, axes = plt.subplots(1, 3, figsize=(11, 4))
 for ax, T in zip(axes, snap_targets):
     ax.imshow(snap_lattices[T], cmap="RdBu", vmin=-1, vmax=1, interpolation="nearest")
     ax.set_title(f"T/J = {T:.3f}")
     ax.set_xticks([]); ax.set_yticks([])
 fig.suptitle(f"Spin configurations | L={L}, J={J}, h/J={H_OVER_J}")
-fig.tight_layout(); fig.savefig(os.path.join(OUT, "snapshots_combined.png"), dpi=140); plt.close(fig)
+fig.tight_layout(); fig.savefig(os.path.join(OUT_SNAP, "snapshots_combined.png"), dpi=140); plt.close(fig)
 
-# ----- animation near T_c -------------------------------------------------
-print("Recording animation trajectory near T_c ...")
-frames = record_trajectory(L=L, T_over_J=T_C, h_over_J=H_OVER_J,
-                           n_equil=500, n_frames=120, sweeps_per_frame=2, seed=1)
+# ----- animations at low T, near T_c, and high T --------------------------
+ANIM_CASES = [
+    (1.5,  "low_T",      "Ordered phase (low $T$)",           1),
+    (T_C,  "critical",   "Critical point ($T \\approx T_c$)", 2),
+    (3.3,  "high_T",     "Disordered phase (high $T$)",       3),
+]
 
-fig, ax = plt.subplots(figsize=(4.5, 4.5))
-im = ax.imshow(frames[0], cmap="RdBu", vmin=-1, vmax=1, interpolation="nearest")
-title = ax.set_title("")
-ax.set_xticks([]); ax.set_yticks([])
+for T_anim, tag, phase_label, seed_val in ANIM_CASES:
+    print(f"Recording animation at T/J = {T_anim:.3f} ({tag}) ...")
+    frames = record_trajectory(L=L, T_over_J=T_anim, h_over_J=H_OVER_J,
+                               n_equil=500, n_frames=120, sweeps_per_frame=2,
+                               seed=seed_val)
 
-def _update(k):
-    im.set_array(frames[k])
-    title.set_text(f"Spin evolution near $T_c$ | sweep {k * 2}")
-    return [im, title]
+    fig, ax = plt.subplots(figsize=(4.5, 4.5))
+    im = ax.imshow(frames[0], cmap="RdBu", vmin=-1, vmax=1, interpolation="nearest")
+    title_obj = ax.set_title("")
+    ax.set_xticks([]); ax.set_yticks([])
 
-anim = animation.FuncAnimation(fig, _update, frames=len(frames), interval=80, blit=False)
-anim.save(os.path.join(OUT, "spin_evolution.gif"), writer="pillow", fps=12, dpi=110)
-plt.close(fig)
+    def _make_update(im_ref, title_ref, T_val, sweeps):
+        def _update(k):
+            im_ref.set_array(frames[k])
+            title_ref.set_text(
+                f"{phase_label}  |  T/J = {T_val:.3f}  |  sweep {k * sweeps}"
+            )
+            return [im_ref, title_ref]
+        return _update
+
+    anim = animation.FuncAnimation(
+        fig, _make_update(im, title_obj, T_anim, 2),
+        frames=len(frames), interval=80, blit=False,
+    )
+    fname = f"spin_evolution_{tag}.gif"
+    anim.save(os.path.join(OUT_ANIM, fname), writer="pillow", fps=12, dpi=110)
+    plt.close(fig)
+    print(f"  Saved: {fname}")
+
 print("Done.")

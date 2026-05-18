@@ -112,22 +112,27 @@ def run_at_temperature(lattice, T_over_J, h_over_J,
     mags = mags[:idx]
     energies = energies[:idx]
 
+    m_mean = mags.mean()
     abs_m = np.abs(mags).mean()
     m2 = (mags ** 2).mean()
     e_mean = energies.mean()
     e2 = (energies ** 2).mean()
 
-    chi = N * (m2 - abs_m ** 2) / T_over_J            # chi * J
+    chi_abs    = N * (m2 - abs_m ** 2)  / T_over_J    # chi * J, based on |m|
+    chi_signed = N * (m2 - m_mean ** 2) / T_over_J    # chi * J, based on signed m
     cv = N * (e2 - e_mean ** 2) / T_over_J ** 2       # heat capacity per site
 
     return {
         "T_over_J": T_over_J,
         "h_over_J": h_over_J,
         "L": L,
+        "m_mean": m_mean,
         "abs_m": abs_m,
         "m2": m2,
         "energy": e_mean,
-        "chi": chi,
+        "chi_abs": chi_abs,
+        "chi_signed": chi_signed,
+        "chi": chi_abs,   # backward-compat alias
         "cv": cv,
         "mags": mags,
         "energies": energies,
@@ -154,9 +159,17 @@ def sweep_temperatures(L, T_over_J_array, h_over_J,
     # Start from random (high-T-like) configuration
     lattice = rng.choice(np.array([-1, 1], dtype=np.int8), size=(L, L))
 
+    # Map each requested target to the closest simulated temperature.
+    # Keyed by sim_T (float) -> original target value, so we can store results
+    # under the caller's requested keys regardless of exact float equality.
+    snap_sim_to_target = {}
+    if return_lattices_at:
+        for tgt in return_lattices_at:
+            idx = int(np.argmin(np.abs(T_sorted - tgt)))
+            snap_sim_to_target[float(T_sorted[idx])] = tgt
+
     results = []
     saved_lattices = {}
-    targets = set(return_lattices_at) if return_lattices_at else set()
 
     for T in T_sorted:
         if not anneal:
@@ -166,8 +179,8 @@ def sweep_temperatures(L, T_over_J_array, h_over_J,
             n_equil=n_equil, n_meas=n_meas, sample_every=sample_every, rng=rng,
         )
         results.append(res)
-        if T in targets:
-            saved_lattices[T] = lattice.copy()
+        if float(T) in snap_sim_to_target:
+            saved_lattices[snap_sim_to_target[float(T)]] = lattice.copy()
 
     # Re-sort results into the original (ascending) order for cleaner plots
     results_sorted = sorted(results, key=lambda r: r["T_over_J"])
