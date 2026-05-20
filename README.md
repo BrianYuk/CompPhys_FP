@@ -43,6 +43,9 @@ run_baseline.py           baseline run: L=20, J=1, h=0
 run_lattice_sizes.py      lattice-size study: L=10,20,50
 run_material_proxy.py     material-proxy study: J=0.75,1.00,1.25
 run_external_field.py     external-field study: h/J=0.00,0.15
+run_cooling_animation.py  cooling/annealing animation (presentation)
+run_full_grid.py          full 27-condition L×J×(h/J) verification grid
+run_lattice_size_extended.py  lattice-size study extended with L=100
 requirements.txt
 ```
 
@@ -81,6 +84,68 @@ python run_external_field.py
 ```
 
 Runs h/J=0.00 and h/J=0.15 at L=20, J=1.00. Shows how a field biases and rounds the transition.
+
+---
+
+## Additional presentation outputs
+
+Three extra scripts produce presentation-support material. They build on
+the same `ising.py` engine and do not change the core analysis.
+
+### Cooling animation
+
+```bash
+python run_cooling_animation.py
+```
+
+Slowly cools an L=50 lattice from T/J=3.3 down to 1.5 over 120 frames so
+the audience can watch ordered domains nucleate and grow.
+Output: `outputs/animation/cooling_transition.gif`.
+This is a **non-equilibrium annealing trajectory** for visual explanation
+only — it is labelled as such and does not replace the fixed-temperature
+quantitative plots.
+
+### Full 27-condition grid
+
+```bash
+python run_full_grid.py
+```
+
+Runs the full parameter grid L=[10,20,50] × J=[0.75,1.00,1.25] ×
+h/J=[0.00,0.15,0.50] (27 conditions). Outputs go to `outputs/full_grid/`:
+a results `.npz`, a summary `.csv`, and two 3×3 small-multiple plots
+(magnetization and susceptibility). Small multiples are used so the grid
+stays readable instead of one plot with 27 lines.
+
+### Extended lattice-size test
+
+```bash
+python run_lattice_size_extended.py
+```
+
+Repeats the lattice-size study with L=[10,20,50,**100**] at J=1.00,
+h/J=0.00. Outputs go to `outputs/lattice_size_extended/`. L=100 is kept
+**only** in this focused finite-size comparison and is deliberately not
+part of the 27-grid.
+
+### Where outputs are saved
+
+```
+outputs/animation/cooling_transition.gif
+outputs/full_grid/                       (npz, csv, 2 small-multiple PNGs)
+outputs/lattice_size_extended/            (npz, csv, 2 PNGs)
+outputs/extended_run_report.txt
+outputs/extended_milestone_output_checklist.md
+outputs/extended_milestone_summary.csv
+```
+
+The full grid is a **verification sweep** — it confirms the expected
+trends hold jointly across all parameters. The main project analysis
+relies on the controlled one-variable-at-a-time comparisons
+(`run_lattice_sizes.py`, `run_material_proxy.py`, `run_external_field.py`).
+Note that J values are exchange-coupling **proxies**, not real named
+materials, and h/J=0.15/0.50 produce **field-biased crossover** behavior,
+not a clean shifted critical temperature.
 
 ---
 
