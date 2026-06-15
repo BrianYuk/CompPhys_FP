@@ -1,0 +1,6 @@
+# Minimal config only — this project is a flat collection of scripts, not an
+# installable package, so there is no [build-system] section.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -9,6 +9,17 @@ env/
 # Output files (regenerable from code)
 outputs/
 *.npz
+# ...but the committed test golden references must stay tracked.
+!tests/golden/*.npz
+
+# Notebooks (the project is script-based; notebooks are not version controlled)
+*.ipynb
+
+# Test / tooling caches
+.pytest_cache/
+
+# Knowledge-graph tooling artifact
+.understand-anything/
 
 # OS / editor
 .DS_Store

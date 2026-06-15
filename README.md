@@ -33,21 +33,46 @@ pip install -r requirements.txt
 
 Numba JIT-compiles the inner Monte Carlo loop. The first run will be slightly slower while Numba compiles the kernels; subsequent runs use cached bytecode.
 
+### Running the tests
+
+The test suite locks the engine's numerical behavior — seeded golden values, the
+RNG-determinism contract, and physics sanity checks — so refactors cannot silently
+change results.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ---
 
 ## Project structure
 
+Files are grouped by role: the importable library, the runnable studies, and the
+reporting step.
+
 ```
-ising.py                  core simulation engine (Metropolis sweep, observables)
-run_baseline.py           baseline run: L=20, J=1, h=0
-run_lattice_sizes.py      lattice-size study: L=10,20,50
-run_material_proxy.py     material-proxy study: J=0.75,1.00,1.25
-run_external_field.py     external-field study: h/J=0.00,0.15
-run_cooling_animation.py  cooling/annealing animation (presentation)
-run_full_grid.py          full 27-condition L×J×(h/J) verification grid
-run_lattice_size_extended.py  lattice-size study extended with L=100
-requirements.txt
+ising_mc/                       importable library (the engine + helpers)
+  ising.py                      core MC engine: advance() sweep primitive + drivers
+  config.py                     shared constants, the T/J grid, output paths
+  observables.py                pure observable / analysis functions
+  plotting.py                   reusable matplotlib figure helpers
+experiments/                    runnable studies (run as modules, see below)
+  run_baseline.py               baseline run: L=20, J=1, h=0
+  run_lattice_sizes.py          lattice-size study: L=10,20,50,100 (averaged)
+  run_material_proxy.py         material-proxy study: J=0.75,1.00,1.25
+  run_external_field.py         external-field study: h/J=0.00,0.15
+  run_cooling_animation.py      cooling/annealing animation (presentation)
+  run_full_grid.py              full 27-condition L×J×(h/J) verification grid
+reports/
+  make_deliverables.py          aggregate results into CSV + checklist + report
+tests/                          characterization, determinism, and physics tests
+requirements.txt                runtime dependencies (pinned)
+requirements-dev.txt            adds pytest for running the tests
 ```
+
+Scripts import the library as a package (`from ising_mc.ising import ...`) and are
+run as modules from the repository root, so the engine is found without any install.
 
 ---
 
@@ -56,7 +81,7 @@ requirements.txt
 ### Baseline
 
 ```bash
-python run_baseline.py
+python -m experiments.run_baseline
 ```
 
 Runs L=20, J=1.00, h/J=0 across 31 temperatures (1.5–3.3), denser near T_c.
@@ -64,15 +89,34 @@ Runs L=20, J=1.00, h/J=0 across 31 temperatures (1.5–3.3), denser near T_c.
 ### Lattice-size comparison
 
 ```bash
-python run_lattice_sizes.py
+python -m experiments.run_lattice_sizes
 ```
 
-Runs L=10, 20, 50 at h/J=0 to show finite-size rounding of the transition.
+Runs L=10, 20, 50, 100 at h/J=0 to show finite-size rounding of the transition.
+The susceptibility peak sits *above* the Onsager point at every finite L (the
+finite-size pseudo-critical temperature) and is located with a sub-grid parabolic
+fit — so a finite lattice whose peak lands exactly on T_c is a noise coincidence,
+not accuracy. Each size's peak still sits above T_c and moves toward it as L grows.
+
+Each size is run several times with different random seeds and **averaged**, so the
+noisy near-T_c peaks settle and the true "bigger L → closer to T_c" trend shows
+through honestly; the curves carry mean ± SEM shaded bands. The repeat count
+defaults to 5 but is adjustable, so a quick single run is available mid-presentation:
+
+```bash
+python -m experiments.run_lattice_sizes            # 5 repeats (~7 min, default)
+python -m experiments.run_lattice_sizes 1          # 1 repeat (~3 min, no error bars)
+python -m experiments.run_lattice_sizes --seeds 8  # 8 repeats
+```
+
+Averaging shrinks the noise like √K but cannot remove it — with single-spin-flip
+Metropolis the largest lattice stays the blurriest. The error bars show that
+honestly rather than forcing a clean trend.
 
 ### Material-proxy comparison
 
 ```bash
-python run_material_proxy.py
+python -m experiments.run_material_proxy
 ```
 
 Runs J=0.75, 1.00, 1.25 at L=20, h/J=0. Plots against absolute temperature to show that higher J shifts the transition to higher T.
@@ -80,22 +124,37 @@ Runs J=0.75, 1.00, 1.25 at L=20, h/J=0. Plots against absolute temperature to sh
 ### External magnetic field
 
 ```bash
-python run_external_field.py
+python -m experiments.run_external_field
 ```
 
 Runs h/J=0.00 and h/J=0.15 at L=20, J=1.00. Shows how a field biases and rounds the transition.
+
+### Interactive explorer
+
+```bash
+python -m experiments.run_interactive
+```
+
+A live desktop app (Tkinter + matplotlib). Pick a lattice size, a coupling proxy
+J, and a starting temperature, then watch the spin grid (red = +1, blue = −1)
+evolve while you drag the **temperature** and **magnetic-field** sliders in real
+time. Temperature and field are in **absolute** units, so a larger J pushes the
+transition to higher T (T_c = 2.269·J) — picking J actually changes the physics.
+Extras: pause/resume, reset, a sweeps-per-frame speed slider, and a live ⟨|m|⟩ /
+phase readout against T_c. Driven by the engine's `advance()` primitive via
+`ising_mc.interactive.LiveSimulation`; needs a display (run it locally, not headless).
 
 ---
 
 ## Additional presentation outputs
 
 Three extra scripts produce presentation-support material. They build on
-the same `ising.py` engine and do not change the core analysis.
+the same `ising_mc` engine and do not change the core analysis.
 
 ### Cooling animation
 
 ```bash
-python run_cooling_animation.py
+python -m experiments.run_cooling_animation
 ```
 
 Slowly cools an L=50 lattice from T/J=3.3 down to 1.5 over 120 frames so
@@ -108,7 +167,7 @@ quantitative plots.
 ### Full 27-condition grid
 
 ```bash
-python run_full_grid.py
+python -m experiments.run_full_grid
 ```
 
 Runs the full parameter grid L=[10,20,50] × J=[0.75,1.00,1.25] ×
@@ -117,26 +176,11 @@ a results `.npz`, a summary `.csv`, and two 3×3 small-multiple plots
 (magnetization and susceptibility). Small multiples are used so the grid
 stays readable instead of one plot with 27 lines.
 
-### Extended lattice-size test
-
-```bash
-python run_lattice_size_extended.py
-```
-
-Repeats the lattice-size study with L=[10,20,50,**100**] at J=1.00,
-h/J=0.00. Outputs go to `outputs/lattice_size_extended/`. L=100 is kept
-**only** in this focused finite-size comparison and is deliberately not
-part of the 27-grid.
-
 ### Where outputs are saved
 
 ```
 outputs/animation/cooling_transition.gif
 outputs/full_grid/                       (npz, csv, 2 small-multiple PNGs)
-outputs/lattice_size_extended/            (npz, csv, 2 PNGs)
-outputs/extended_run_report.txt
-outputs/extended_milestone_output_checklist.md
-outputs/extended_milestone_summary.csv
 ```
 
 The full grid is a **verification sweep** — it confirms the expected
@@ -167,7 +211,9 @@ outputs/
     snapshot_highT.png            spin lattice at T/J ≈ 3.3
     snapshots_combined.png        all three side by side
   animation/
-    spin_evolution.gif            spin dynamics near T_c
+    spin_evolution_low_T.gif      spin dynamics in the ordered phase
+    spin_evolution_critical.gif   spin dynamics near T_c
+    spin_evolution_high_T.gif     spin dynamics in the disordered phase
   lattice_size/
     lattice_size_results.npz
     plot_magnetization_by_L.png   |m| vs T/J for L=10,20,50
@@ -176,6 +222,7 @@ outputs/
     material_proxy_results.npz
     plot_magnetization_vs_absolute_T_by_J.png
     plot_susceptibility_vs_absolute_T_by_J.png
+    plot_overlay_reduced_units.png            curves overlap in T/J (J-independence check)
   external_field/
     external_field_results.npz
     plot_signed_magnetization_by_h.png
