@@ -48,8 +48,7 @@ pytest
 
 ## Project structure
 
-Files are grouped by role: the importable library, the runnable studies, and the
-reporting step.
+Files are grouped by role: the importable library and the runnable studies.
 
 ```
 ising_mc/                       importable library (the engine + helpers)
@@ -59,13 +58,11 @@ ising_mc/                       importable library (the engine + helpers)
   plotting.py                   reusable matplotlib figure helpers
 experiments/                    runnable studies (run as modules, see below)
   run_baseline.py               baseline run: L=20, J=1, h=0
-  run_lattice_sizes.py          lattice-size study: L=10,20,50,100 (averaged)
-  run_material_proxy.py         material-proxy study: J=0.75,1.00,1.25
+  run_lattice_sizes.py          lattice-size study: L=10,20,50 (averaged)
+  run_material_proxy.py         material comparison: Ni/Fe/Co (J=0.60/1.00/1.34)
   run_external_field.py         external-field study: h/J=0.00,0.15
   run_cooling_animation.py      cooling/annealing animation (presentation)
   run_full_grid.py              full 27-condition L×J×(h/J) verification grid
-reports/
-  make_deliverables.py          aggregate results into CSV + checklist + report
 tests/                          characterization, determinism, and physics tests
 requirements.txt                runtime dependencies (pinned)
 requirements-dev.txt            adds pytest for running the tests
@@ -92,7 +89,7 @@ Runs L=20, J=1.00, h/J=0 across 31 temperatures (1.5–3.3), denser near T_c.
 python -m experiments.run_lattice_sizes
 ```
 
-Runs L=10, 20, 50, 100 at h/J=0 to show finite-size rounding of the transition.
+Runs L=10, 20, 50 at h/J=0 to show finite-size rounding of the transition.
 The susceptibility peak sits *above* the Onsager point at every finite L (the
 finite-size pseudo-critical temperature) and is located with a sub-grid parabolic
 fit — so a finite lattice whose peak lands exactly on T_c is a noise coincidence,
@@ -113,13 +110,13 @@ Averaging shrinks the noise like √K but cannot remove it — with single-spin-
 Metropolis the largest lattice stays the blurriest. The error bars show that
 honestly rather than forcing a clean trend.
 
-### Material-proxy comparison
+### Material comparison (Nickel, Iron, Cobalt)
 
 ```bash
 python -m experiments.run_material_proxy
 ```
 
-Runs J=0.75, 1.00, 1.25 at L=20, h/J=0. Plots against absolute temperature to show that higher J shifts the transition to higher T.
+Runs three real ferromagnetic metals — Nickel (J=0.60), Iron (J=1.00), Cobalt (J=1.34) — at L=20, h/J=0. Each J is calibrated so the ratio of J values matches the ratio of the metals' experimental Curie temperatures (Kittel, Ch. 12). Plotting against absolute temperature separates the curves: Cobalt transitions at the highest T, then Iron, then Nickel.
 
 ### External magnetic field
 
@@ -135,11 +132,12 @@ Runs h/J=0.00 and h/J=0.15 at L=20, J=1.00. Shows how a field biases and rounds 
 python -m experiments.run_interactive
 ```
 
-A live desktop app (Tkinter + matplotlib). Pick a lattice size, a coupling proxy
-J, and a starting temperature, then watch the spin grid (red = +1, blue = −1)
-evolve while you drag the **temperature** and **magnetic-field** sliders in real
-time. Temperature and field are in **absolute** units, so a larger J pushes the
-transition to higher T (T_c = 2.269·J) — picking J actually changes the physics.
+A live desktop app (Tkinter + matplotlib). Pick a lattice size, a ferromagnetic
+material (Nickel, Iron, or Cobalt — each sets its coupling J), and a starting
+temperature, then watch the spin grid (red = +1, blue = −1) evolve while you drag
+the **temperature** and **magnetic-field** sliders in real time. Temperature and
+field are in **absolute** units, so a larger J pushes the transition to higher T
+(T_c = 2.269·J) — picking the material actually changes the physics.
 Extras: pause/resume, reset, a sweeps-per-frame speed slider, and a live ⟨|m|⟩ /
 phase readout against T_c. Driven by the engine's `advance()` primitive via
 `ising_mc.interactive.LiveSimulation`; needs a display (run it locally, not headless).
@@ -187,9 +185,10 @@ The full grid is a **verification sweep** — it confirms the expected
 trends hold jointly across all parameters. The main project analysis
 relies on the controlled one-variable-at-a-time comparisons
 (`run_lattice_sizes.py`, `run_material_proxy.py`, `run_external_field.py`).
-Note that J values are exchange-coupling **proxies**, not real named
-materials, and h/J=0.15/0.50 produce **field-biased crossover** behavior,
-not a clean shifted critical temperature.
+Note that the full grid's J values are generic exchange-coupling **proxies**
+(the named-material comparison lives in `run_material_proxy.py`), and
+h/J=0.15/0.50 produce **field-biased crossover** behavior, not a clean
+shifted critical temperature.
 
 ---
 

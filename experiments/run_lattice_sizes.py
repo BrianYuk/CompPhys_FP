@@ -1,5 +1,5 @@
 """
-Lattice-size study: L = 10, 20, 50, 100; J = 1.00; h/J = 0.00
+Lattice-size study: L = 10, 20, 50; J = 1.00; h/J = 0.00
 
 The project's central theme — finite-size effects on the phase transition. As L
 grows the magnetization drop sharpens and the susceptibility peak grows taller
@@ -177,8 +177,8 @@ def main(argv=None):
 
 
 def _save_results(out, T_over_J, curves_by_L):
-    # chi_abs_L{L} / abs_m_L{L} hold the across-repeat MEAN curves (the *_sem_L{L}
-    # keys carry their standard errors); this keeps make_deliverables compatible.
+    # chi_abs_L{L} / abs_m_L{L} hold the across-repeat MEAN curves; the *_sem_L{L}
+    # keys carry their standard errors.
     save_dict = {"T_over_J": T_over_J, "J": J, "h_over_J": H_OVER_J,
                  "T_c_exact": T_C, "sizes": np.array(SIZES)}
     for L in SIZES:

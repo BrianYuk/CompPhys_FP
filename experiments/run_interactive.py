@@ -1,16 +1,19 @@
 """
 Interactive live Ising explorer (Tkinter + embedded matplotlib).
 
-Pick a lattice size L, a coupling proxy J, and a starting temperature; then watch the
-spin grid (red = +1, blue = -1) evolve while you drag the temperature and magnetic-
-field sliders. The grid is driven by the engine's resumable `advance()` primitive via
-`LiveSimulation`, so changing a control mid-run lets the *current* configuration keep
-evolving instead of restarting.
+Pick a lattice size L, a ferromagnetic material (Nickel, Iron, or Cobalt — each
+sets its coupling J), and a starting temperature; then watch the spin grid
+(red = +1, blue = -1) evolve while you drag the temperature and magnetic-field
+sliders. The grid is driven by the engine's resumable `advance()` primitive via
+`LiveSimulation`, so changing a control mid-run lets the *current* configuration
+keep evolving instead of restarting.
 
-Units: the J choice is a real coupling, so the sliders are in ABSOLUTE temperature and
-field. The engine works in reduced units, so each frame we pass T/J = T_abs / J and
-h/J = h_abs / J. A larger J therefore pushes the transition to higher absolute T
-(Onsager: T_c = 2.26919 * J) — matching the material-proxy study.
+Units: each material's J is a real coupling, so the sliders are in ABSOLUTE
+temperature and field. The engine works in reduced units, so each frame we pass
+T/J = T_abs / J and h/J = h_abs / J. A larger J pushes the transition to higher
+absolute T (Onsager: T_c = 2.26919 * J), so Cobalt orders at a higher absolute
+temperature than Iron or Nickel — matching the material comparison study
+(run_material_proxy.py).
 
 Run:
     python -m experiments.run_interactive
@@ -24,7 +27,16 @@ from matplotlib.figure import Figure
 from ising_mc import config
 from ising_mc.interactive import LiveSimulation
 
-J_OPTIONS = [0.75, 1.00, 1.25]
+# Real ferromagnetic metals, each mapped to a dimensionless coupling J calibrated so
+# the ratio of J values matches the ratio of experimental Curie temperatures (Kittel,
+# Ch. 12). Picking a material sets J, which sets the absolute T_c = 2.26919 * J.
+MATERIALS = [
+    # (name, J value)
+    ("Nickel (Ni)", 0.60),   # T_c ≈ 627 K
+    ("Iron (Fe)",   1.00),   # T_c ≈ 1043 K  (reference)
+    ("Cobalt (Co)", 1.34),   # T_c ≈ 1394 K
+]
+NAME_BY_J = {j: name for name, j in MATERIALS}
 L_MIN, L_MAX, L_DEFAULT = 4, 150, 50
 T_DEFAULT = 2.5
 SPEED_MIN, SPEED_MAX, SPEED_DEFAULT = 1, 20, 4
@@ -60,12 +72,13 @@ class IsingApp:
         self.L_var = tk.StringVar(value=str(L_init))
         tk.Entry(self.setup, textvariable=self.L_var, width=8).grid(row=0, column=1, sticky="w")
 
-        tk.Label(self.setup, text="Coupling proxy J:").grid(row=1, column=0, sticky="w")
+        tk.Label(self.setup, text="Material:").grid(row=1, column=0, sticky="nw")
         self.J_var = tk.DoubleVar(value=J_init)
         j_row = tk.Frame(self.setup)
         j_row.grid(row=1, column=1, sticky="w")
-        for j in J_OPTIONS:
-            tk.Radiobutton(j_row, text=f"{j:.2f}", variable=self.J_var, value=j).pack(side="left")
+        for name, j in MATERIALS:
+            tk.Radiobutton(j_row, text=f"{name}   (J = {j:.2f})",
+                           variable=self.J_var, value=j).pack(anchor="w")
 
         tk.Label(self.setup, text="Starting temperature T (absolute):").grid(
             row=2, column=0, sticky="w")
@@ -146,8 +159,9 @@ class IsingApp:
 
         self.readout = tk.Label(controls, justify="left", font=("TkFixedFont", 11))
         self.readout.pack(anchor="w", pady=(8, 0))
+        material = NAME_BY_J.get(self.J, f"J = {self.J:.2f}")
         tk.Label(controls, fg="grey",
-                 text=f"T_c = {tc_abs:.3f}  (J = {self.J:.2f})").pack(anchor="w")
+                 text=f"{material}:  T_c = {tc_abs:.3f}  (J = {self.J:.2f})").pack(anchor="w")
 
         self.root.geometry("880x600")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
