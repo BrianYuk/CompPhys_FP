@@ -1,17 +1,25 @@
 """
-Material-proxy study: L=20, J = [0.75, 1.00, 1.25], h/J = 0.00
+Material comparison: L=20, three real ferromagnetic transition metals
+(Nickel, Iron, Cobalt) at h/J = 0.00.
 
-In reduced units (T/J) the Ising model curves overlap for different J.
-Plotting against *absolute* temperature T_abs = (T/J) * J reveals that
-higher J shifts the transition to a higher absolute temperature, mimicking
-a "stiffer" magnetic material.
+Each material is represented by a dimensionless coupling J calibrated so
+that the ratio of J values matches the ratio of experimental Curie
+temperatures (Kittel, Introduction to Solid State Physics, Ch. 12):
 
-This is a simplified proxy — not a real named material.
+    Material       Experimental T_c      J used here    T_c_reduced
+    Nickel  (Ni)   627  K                0.60           ≈ 1.36
+    Iron    (Fe)   1043 K (reference)    1.00           ≈ 2.27
+    Cobalt  (Co)   1394 K                1.34           ≈ 3.04
 
-Expected transition temperatures (Tc ≈ 2.269 * J):
-    J = 0.75  ->  Tc_abs ≈ 1.70
-    J = 1.00  ->  Tc_abs ≈ 2.27
-    J = 1.25  ->  Tc_abs ≈ 2.84
+In reduced units (T/J), the Ising model curves overlap for different J -
+the dimensionless physics is identical. Plotting against absolute
+temperature T_abs = (T/J) * J reveals the material-dependent transition:
+Cobalt has the highest T_c, followed by Iron, with Nickel transitioning at
+the lowest absolute temperature.
+
+This is a pedagogical analogy. Real ferromagnets are 3D crystals; the 2D
+Ising model captures the qualitative ratio of their Curie temperatures
+but not their bulk thermodynamics quantitatively.
 
 Outputs (outputs/material_proxy/):
     plot_magnetization_vs_absolute_T_by_J.png
@@ -33,8 +41,15 @@ L = 20
 H_OVER_J = 0.0
 T_C_REDUCED = config.T_C    # Onsager exact T_c/J ≈ 2.26919
 
-J_VALUES = [0.75, 1.00, 1.25]
-COLORS = ["C0", "C1", "C2"]
+MATERIALS = [
+    # (name, J value, plot color)
+    ("Nickel (Ni)", 0.60, "C0"),   # weakest ferromagnet, T_c ≈ 627 K
+    ("Iron (Fe)",   1.00, "C3"),   # reference, T_c ≈ 1043 K
+    ("Cobalt (Co)", 1.34, "C1"),   # strongest, T_c ≈ 1394 K
+]
+J_VALUES = [j for _, j, _ in MATERIALS]
+COLORS   = [c for _, _, c in MATERIALS]
+NAMES_BY_J = {j: name for name, j, _ in MATERIALS}
 
 
 def main():
@@ -73,8 +88,9 @@ def _save_results(out, T_over_J, curves_by_J):
 
 
 def _label_for(J):
-    tc_abs = T_C_REDUCED * J   # the transition sits at T_c/J * J in absolute units
-    return f"J = {J:.2f}  ($T_c \\approx {tc_abs:.2f}$)"
+    tc_abs = T_C_REDUCED * J
+    name = NAMES_BY_J[J]
+    return f"{name}, J = {J:.2f}  ($T_c \\approx {tc_abs:.2f}$)"
 
 
 def _plot_vs_absolute_temperature(out, curves_by_J):
@@ -84,7 +100,7 @@ def _plot_vs_absolute_temperature(out, curves_by_J):
                    _label_for(J)) for J, c in zip(J_VALUES, COLORS)]
     plotting.line_plot(
         mag_curves, xlabel=xlabel, ylabel=r"$\langle|m|\rangle$",
-        title=f"Magnetization: material-proxy comparison  (L={L}, h/J={H_OVER_J})",
+        title=f"Magnetization: Nickel, Iron, Cobalt  (L={L}, h/J={H_OVER_J})",
         out_path=os.path.join(out, "plot_magnetization_vs_absolute_T_by_J.png"),
     )
 
@@ -92,7 +108,7 @@ def _plot_vs_absolute_temperature(out, curves_by_J):
                    _label_for(J)) for J, c in zip(J_VALUES, COLORS)]
     plotting.line_plot(
         chi_curves, xlabel=xlabel, ylabel=r"$\chi J$",
-        title=f"Susceptibility: material-proxy comparison  (L={L}, h/J={H_OVER_J})",
+        title=f"Susceptibility: Nickel, Iron, Cobalt  (L={L}, h/J={H_OVER_J})",
         out_path=os.path.join(out, "plot_susceptibility_vs_absolute_T_by_J.png"),
     )
 
@@ -108,9 +124,9 @@ def _plot_overlay_reduced_units(out, curves_by_J):
     for J, c in zip(J_VALUES, COLORS):
         T = curves_by_J[J]["T"]
         axes[0].plot(T, curves_by_J[J]["abs_m"], "o-", color=c, lw=1.5, ms=3,
-                     label=f"J={J:.2f}")
+             label=NAMES_BY_J[J])
         axes[1].plot(T, curves_by_J[J]["chi"], "^-", color=c, lw=1.5, ms=3,
-                     label=f"J={J:.2f}")
+             label=NAMES_BY_J[J])
     panels = zip(axes,
                  [r"$\langle|m|\rangle$", r"$\chi J$"],
                  ["Magnetization in T/J units", "Susceptibility in T/J units"])
